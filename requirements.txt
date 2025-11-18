@@ -1,0 +1,5 @@
+streamlit
+supabase
+streamlit-echarts
+pandas
+pytz

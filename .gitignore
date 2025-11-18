@@ -1,0 +1,63 @@
+# -------------------------
+# Python
+# -------------------------
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.pkl
+*.db
+*.sqlite3
+
+# Virtual environments
+env/
+venv/
+.venv/
+ENV/
+env.bak/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# -------------------------
+# Streamlit
+# -------------------------
+.streamlit/secrets.toml
+.streamlit/config.toml
+
+# Don't upload local cache
+**/.streamlit/
+
+# -------------------------
+# OS / Editor files
+# -------------------------
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+
+# VSCode
+.vscode/
+.code/
+
+# PyCharm
+.idea/
+
+# -------------------------
+# Logs
+# -------------------------
+logs/
+*.log
+
+# -------------------------
+# Node / JS (if you ever have front-end stuff)
+# -------------------------
+node_modules/
+npm-debug.log
+yarn-error.log
+
+# -------------------------
+# Build artifacts
+# -------------------------
+dist/
+build/
