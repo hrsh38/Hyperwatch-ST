@@ -1,11 +1,10 @@
 import streamlit as st
 from supabase import create_client
-from streamlit_echarts import st_echarts
 import pandas as pd
 from datetime import datetime, timedelta
-import pytz
+from streamlit_lightweight_charts import renderLightweightCharts
 
-st.set_page_config(page_title="Hyperwatch – ECharts Dashboard", layout="wide")
+st.set_page_config(page_title="Hyperwatch – Candlestick Dashboard", layout="wide")
 
 # === Supabase ===
 SUPABASE_URL = st.secrets["SUPABASE_URL"]
@@ -14,12 +13,12 @@ supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 
 # ---------------------------------------------------
-# Load snapshots
+# Load candlestick data
 # ---------------------------------------------------
 @st.cache_data(ttl=300)
-def load_snapshots():
+def load_candlestick_data():
     resp = (
-        supabase.table("cohort_snapshots")
+        supabase.table("candlestick_data")
         .select("*")
         .order("timestamp", desc=False)
         .execute()
@@ -32,35 +31,29 @@ def load_snapshots():
     df["timestamp"] = pd.to_datetime(df["timestamp"], utc=True)
     df["timestamp"] = df["timestamp"].dt.tz_convert("America/New_York")
 
-    # Format to 12-hour time
-    df["time"] = df["timestamp"].dt.strftime("%Y-%m-%d %I:%M:%S")
-
     return df
 
 
-# Sidebar refresh button (placed before loading so the cleared cache
-# takes effect on the next run)
+# Sidebar refresh button
 if st.sidebar.button("🔄 Refresh Data"):
-    # Try to clear the specific function cache first; fall back to clearing
-    # all cached data if the function-level API isn't available.
     try:
-        load_snapshots.clear()
+        load_candlestick_data.clear()
     except Exception:
         try:
             st.cache_data.clear()
         except Exception:
             pass
-    # Trigger a rerun so the top-level `load_snapshots()` call fetches fresh data
-    st.experimental_rerun()
+    st.rerun()
 
-# Load snapshots (will use cache unless cleared above)
-df = load_snapshots()
+# Load data
+df = load_candlestick_data()
 
 if df.empty:
-    st.error("cohort_snapshots table is empty.")
+    st.error("candlestick_data table is empty.")
     st.stop()
 
 df = df.sort_values("timestamp")
+
 # ---------------------------------------------------
 # TRADINGVIEW-STYLE DATE / TIME RANGE CONTROLS
 # ---------------------------------------------------
@@ -81,7 +74,7 @@ tv_presets = {
 
 preset = st.sidebar.selectbox("Quick Range", list(tv_presets.keys()), index=8)
 
-# Calendar picker (TradingView style)
+# Calendar picker
 start_date, end_date = st.sidebar.date_input(
     "Custom Date Range",
     value=(df["timestamp"].min().date(), df["timestamp"].max().date())
@@ -109,68 +102,50 @@ asset_choice = st.sidebar.radio(
 )
 
 asset_labels = {
-    "btc": "BTC Price",
-    "eth": "ETH Price",
-    "sol": "SOL Price"
+    "btc": "BTC",
+    "eth": "ETH",
+    "sol": "SOL"
 }
 
-price_colors = {
-    "btc": "#00B7FF",
-    "eth": "#AA6BFF",
-    "sol": "#00FFAB"
-}
 def classify_bias(value):
     if value <= -0.60:
-        return "Very Bearish", "#D32F2F"   # strong red
+        return "Very Bearish", "#D32F2F"
     elif value <= -0.20:
-        return "Bearish", "#F57C00"        # orange-red
+        return "Bearish", "#F57C00"
     elif value <= 0.20:
-        return "Neutral", "#757575"        # gray
+        return "Neutral", "#757575"
     elif value <= 0.60:
-        return "Bullish", "#4CAF50"        # green
+        return "Bullish", "#4CAF50"
     else:
-        return "Very Bullish", "#2ECC71"   # bright green
+        return "Very Bullish", "#2ECC71"
 
 cohort_colors = {
-    "fish": "#1f77b4",         # blue
-    "dolphin": "#ff7f0e",      # orange
-    "apex_predator": "#2ca02c",# green
-    "small_whale": "#d62728",  # red
-    "whale": "#9467bd",        # purple
-    "tidal_whale": "#8c564b",  # brown
-    "leviathan": "#e377c2"     # pink
+    "fish": "#1f77b4",
+    "dolphin": "#ff7f0e",
+    "apex_predator": "#2ca02c",
+    "small_whale": "#d62728",
+    "whale": "#9467bd",
+    "tidal_whale": "#8c564b",
+    "leviathan": "#e377c2"
 }
 
 # ---------------------------------------------------
-# Determine time & price padding
-# ---------------------------------------------------
-min_time = df["time"].iloc[0]
-max_time = df["time"].iloc[-1]
-
-min_price = df[asset_choice].min()
-max_price = df[asset_choice].max()
-padding = (max_price - min_price) * 0.03
-
-y_min = float(min_price - padding)
-y_max = float(max_price + padding)
-
-
-# ---------------------------------------------------
-# Sidebar cohort selector
+# Sidebar options
 # ---------------------------------------------------
 cohort_columns = [
     "fish", "dolphin", "apex_predator",
     "small_whale", "whale", "tidal_whale", "leviathan"
 ]
 
-# selected = st.sidebar.multiselect(
-#     "Choose cohort segments",
-#     cohort_columns,
-#     default=cohort_columns
-# )
+show_cohorts = st.sidebar.checkbox("Show Cohort Lines", value=True)
 
-show_markers = st.sidebar.checkbox("Show snapshot markers", value=False)
-
+selected_cohorts = []
+if show_cohorts:
+    selected_cohorts = st.sidebar.multiselect(
+        "Select Cohorts",
+        cohort_columns,
+        default=cohort_columns
+    )
 
 # ---------------------------------------------------
 # KPI CARDS FOR COHORTS
@@ -221,127 +196,126 @@ for i, seg in enumerate(cohort_columns):
         st.markdown(html, unsafe_allow_html=True)
 
 # ---------------------------------------------------
-# Build series list
+# PREPARE DATA FOR LIGHTWEIGHT CHARTS
 # ---------------------------------------------------
-series = []
 
-# ++++++++++++++++++++++++++++++
-# PRICE LINE (btc / eth / sol)
-# ++++++++++++++++++++++++++++++
-price_series = {
-    "name": asset_choice.upper(),
-    "type": "line",
-    "smooth": True,
-    "yAxisIndex": 0,
-    "symbol": "circle" if show_markers else "none",
-    "symbolSize": 6,
-    "data": [
-        [row["time"], float(row[asset_choice])]
-        for _, row in df.iterrows()
-    ],
-    "lineStyle": {
-        "width": 5,
-        "color": price_colors[asset_choice],
-        "shadowColor": price_colors[asset_choice] + "90",
-        "shadowBlur": 20,
-    },
-    "areaStyle": {
-        "color": price_colors[asset_choice] + "20"
-    }
-}
+# Convert timestamp to Unix timestamp (seconds)
+df['time'] = df['timestamp'].astype('int64') // 10**9
 
-series.append(price_series)
-
-# ++++++++++++++++++++++++++++++
-# OPTIONAL PRICE MARKERS
-# ++++++++++++++++++++++++++++++
-if show_markers:
-    series.append({
-        "name": "snapshot",
-        "type": "scatter",
-        "yAxisIndex": 0,
-        "symbolSize": 10,
-        "itemStyle": {"color": "#FFD700"},
-        "data": [
-            [row["time"], float(row[asset_choice])]
-            for _, row in df.iterrows()
-        ],
+# Prepare candlestick data
+candlestick_data = []
+for _, row in df.iterrows():
+    candlestick_data.append({
+        'time': int(row['time']),
+        'open': float(row[f'{asset_choice}_open']),
+        'high': float(row[f'{asset_choice}_high']),
+        'low': float(row[f'{asset_choice}_low']),
+        'close': float(row[f'{asset_choice}_close'])
     })
 
-# ++++++++++++++++++++++++++++++
-# COHORT LINES — MUTED + THIN
-# ++++++++++++++++++++++++++++++
+# Calculate cohort bias range
+cohort_values = []
 for seg in cohort_columns:
-    color = cohort_colors[seg]
+    cohort_values.extend(df[seg].dropna().tolist())
 
-    cohort_line = {
-        "name": seg,
-        "type": "line",
-        "smooth": True,
-        "yAxisIndex": 1,
-        "symbol": "none",
+if cohort_values:
+    cohort_min = min(cohort_values)
+    cohort_max = max(cohort_values)
+    
+    # Add ±0.3 padding
+    right_axis_min = cohort_min - 0.3
+    right_axis_max = cohort_max + 0.3
+else:
+    right_axis_min = -1.5
+    right_axis_max = 1.5
 
-        # MOST IMPORTANT FIX:
-        "itemStyle": {"color": color},
-        "lineStyle": {
-            "width": 1.5,
-            "opacity": 0.70,
-            "color": color,
-        },
+print(f"Right axis range: {right_axis_min:.2f} to {right_axis_max:.2f}")
 
-        "data": [
-            [row["time"], float(row[seg])]
-            for _, row in df.iterrows()
-            if row[seg] is not None
-        ]
-    }
-
-    series.append(cohort_line)
-
+# Prepare cohort line data
+cohort_series = []
+if show_cohorts and selected_cohorts:
+    for seg in selected_cohorts:
+        line_data = []
+        for _, row in df.iterrows():
+            line_data.append({
+                'time': int(row['time']),
+                'value': float(row[seg])
+            })
+        
+        cohort_series.append({
+            'type': 'Line',
+            'data': line_data,
+            'options': {
+                'color': cohort_colors[seg],
+                'lineWidth': 2,
+                'title': seg.replace('_', ' ').title(),
+                'priceScaleId': 'left'
+            }
+        })
 
 # ---------------------------------------------------
-# ECharts Configuration
+# CREATE LIGHTWEIGHT CHART
 # ---------------------------------------------------
-options = {
-    "backgroundColor": "#000",
-    "tooltip": {"trigger": "axis"},
-    "legend": {
-        "textStyle": {"color": "#ddd"},
-        "top": 10
+
+chartOptions = {
+    'layout': {
+        'background': {'color': '#000000'},
+        'textColor': '#d1d4dc',
     },
-    "dataZoom": [
-        {"type": "inside"},
-        {"type": "slider", "height": 20}
-    ],
-    "xAxis": {
-        "type": "time",
-        "boundaryGap": False,
-        "axisLabel": {"color": "#bbb", "rotate": 45},
-        "min": min_time,
-        "max": max_time,
+    'grid': {
+        'vertLines': {'color': '#1e1e1e'},
+        'horzLines': {'color': '#1e1e1e'},
     },
-    "yAxis": [
-        {
-            # =============================
-            # PRICE AXIS (btc / eth / sol)
-            # =============================
-            "type": "value",
-            "name": asset_labels[asset_choice],
-            "axisLabel": {"color": price_colors[asset_choice]},
-            "splitLine": {"lineStyle": {"color": "#1e1e1e"}},
-            "scale": True,
-            "min": y_min,
-            "max": y_max
-        },
-        {
-            "type": "value",
-            "name": "Cohort Bias",
-            "axisLabel": {"color": "#bbb"},
-            "splitLine": {"show": False},
-            "scale": True,
-        }
-    ],
-    "series": series
+    'crosshair': {
+        'mode': 0
+    },
+    'rightPriceScale': {
+        'visible': True,
+        'borderColor': '#2B2B43',
+    },
+    'leftPriceScale': {
+        'visible': True,
+        'borderColor': '#2B2B43',
+    },
+    'timeScale': {
+        'borderColor': '#2B2B43',
+        'timeVisible': True,
+        'secondsVisible': False,
+    },
+    'height': 600,
 }
 
-st_echarts(options=options, height="650px")
+# Main candlestick series
+seriesCandlestickChart = [
+    {
+        'type': 'Candlestick',
+        'data': candlestick_data,
+        'options': {
+            'upColor': '#00C087',
+            'downColor': '#EF5350',
+            'borderVisible': False,
+            'wickUpColor': '#00C087',
+            'wickDownColor': '#EF5350',
+            'priceScaleId': 'right'  # Price on right side
+        }
+    }
+]
+
+# Add cohort lines
+seriesCandlestickChart.extend(cohort_series)
+
+st.subheader(f"{asset_labels[asset_choice]} Candlestick Chart")
+
+renderLightweightCharts([
+    {
+        "chart": chartOptions,
+        "series": seriesCandlestickChart
+    }
+], 'candlestick')
+
+# ---------------------------------------------------
+# DATA TABLE (Optional)
+# ---------------------------------------------------
+if st.sidebar.checkbox("Show Raw Data", value=False):
+    st.subheader("Raw Candlestick Data")
+    st.dataframe(df)
