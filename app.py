@@ -38,6 +38,22 @@ def load_snapshots():
     return df
 
 
+# Sidebar refresh button (placed before loading so the cleared cache
+# takes effect on the next run)
+if st.sidebar.button("🔄 Refresh Data"):
+    # Try to clear the specific function cache first; fall back to clearing
+    # all cached data if the function-level API isn't available.
+    try:
+        load_snapshots.clear()
+    except Exception:
+        try:
+            st.cache_data.clear()
+        except Exception:
+            pass
+    # Trigger a rerun so the top-level `load_snapshots()` call fetches fresh data
+    st.experimental_rerun()
+
+# Load snapshots (will use cache unless cleared above)
 df = load_snapshots()
 
 if df.empty:
@@ -45,10 +61,6 @@ if df.empty:
     st.stop()
 
 df = df.sort_values("timestamp")
-# Sidebar refresh button
-if st.sidebar.button("🔄 Refresh Data"):
-    load_snapshots.clear()      # clears cache
-    st.experimental_rerun()     # reloads app instantly
 # ---------------------------------------------------
 # TRADINGVIEW-STYLE DATE / TIME RANGE CONTROLS
 # ---------------------------------------------------
