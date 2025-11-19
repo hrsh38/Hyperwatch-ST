@@ -3,4 +3,5 @@ supabase
 streamlit-echarts
 pandas
 pytz
-streamlit-lightweight-charts
+streamlit-lightweight-chart
+plotly
