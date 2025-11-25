@@ -58,41 +58,141 @@ cohort_colors = {
 # ---------------------------------------------------
 # Data Loading
 # ---------------------------------------------------
-@st.cache_data(ttl=300)
-def load_candlestick_data():
-    resp = (
-        supabase.table("candlestick_data")
-        .select("*")
-        .order("timestamp", desc=False)
-        .execute()
-    )
-    df = pd.DataFrame(resp.data)
-    if df.empty:
-        return df
+def get_cache_key():
+    """Generate cache key that changes every minute"""
+    import time
+    return int(time.time() / 60)  # Changes every 60 seconds
+
+@st.cache_data(ttl=60, show_spinner="Loading data...")
+def load_candlestick_data(cache_key):
+    all_data = []
+    start = 0
+    chunk_size = 1000
+    
+    while True:
+        # Fetch data in chunks
+        resp = (
+            supabase.table("candlestick_data")
+            .select("*")
+            .order("timestamp", desc=False)
+            .range(start, start + chunk_size - 1)
+            .execute()
+        )
+        
+        if not resp.data:
+            break
+        
+        all_data.extend(resp.data)
+        
+        # If we got fewer records than chunk_size, we've reached the end
+        if len(resp.data) < chunk_size:
+            break
+        
+        start += chunk_size
+    
+    if not all_data:
+        return pd.DataFrame()
+    
+    df = pd.DataFrame(all_data)
     df["timestamp"] = pd.to_datetime(df["timestamp"], utc=True)
     df["timestamp"] = df["timestamp"].dt.tz_convert("America/New_York")
+    
     return df
+
+# ---------------------------------------------------
+# Timeframe Aggregation
+# ---------------------------------------------------
+def aggregate_timeframe(df, timeframe_minutes):
+    """Aggregate 5-minute candles into larger timeframes"""
+    if timeframe_minutes == 5:
+        return df  # No aggregation needed
+    
+    # Create a copy
+    df = df.copy()
+    
+    # For daily candles, align to UTC midnight
+    if timeframe_minutes == 1440:  # 1 day
+        # Convert to UTC for daily alignment
+        df['interval'] = df['timestamp'].dt.tz_convert('UTC').dt.floor('D')
+        # Convert back to EST for display
+        df['interval'] = df['interval'].dt.tz_convert('America/New_York')
+    else:
+        # For intraday timeframes, use EST timezone
+        df['interval'] = df['timestamp'].dt.floor(f'{timeframe_minutes}min')
+    
+    # Aggregate OHLC data for all assets
+    agg_dict = {}
+    for asset in ['btc', 'eth', 'sol']:
+        agg_dict[f'{asset}_open'] = 'first'
+        agg_dict[f'{asset}_high'] = 'max'
+        agg_dict[f'{asset}_low'] = 'min'
+        agg_dict[f'{asset}_close'] = 'last'
+    
+    # Aggregate cohort data (using last value for each interval)
+    for seg in cohort_columns:
+        for metric in ['bias', 'exposure_ratio', 'total_size', 'total_value', 
+                       'total_perp_equity', 'total_active_perp_equity', 
+                       'count_open_positions', 'count_traders_in_position', 
+                       'count_traders_in_profit', 'perp_pnl',
+                       'long_total_value', 'long_count_open_positions',
+                       'short_total_value', 'short_count_open_positions']:
+            col = f'{seg}_{metric}'
+            if col in df.columns:
+                agg_dict[col] = 'last'
+    
+    # Group and aggregate
+    aggregated = df.groupby('interval').agg(agg_dict).reset_index()
+    aggregated.rename(columns={'interval': 'timestamp'}, inplace=True)
+    
+    return aggregated
 
 # ---------------------------------------------------
 # Sidebar
 # ---------------------------------------------------
 st.sidebar.title("⚙️ Controls")
 
-if st.sidebar.button("🔄 Refresh Data"):
-    try:
-        load_candlestick_data.clear()
-    except:
-        try:
-            st.cache_data.clear()
-        except:
-            pass
+# Manual refresh button
+if st.sidebar.button("🔄 Refresh Data", type="primary"):
+    st.cache_data.clear()
     st.rerun()
 
-df = load_candlestick_data()
+# Load data with cache key
+df = load_candlestick_data(get_cache_key())
 
 if df.empty:
-    st.error("No data available.")
+    st.error("No data available in database.")
     st.stop()
+
+# Show data freshness info
+latest_time = df.iloc[-1]['timestamp']
+import time as time_module
+current_time = pd.Timestamp.now(tz='America/New_York')
+age_minutes = (current_time - latest_time).total_seconds() / 60
+
+st.sidebar.info(f"📊 Last data: {latest_time.strftime('%H:%M:%S EST')}")
+st.sidebar.info(f"⏱️ Age: {age_minutes:.1f} minutes")
+# st.sidebar.info(f"📈 Candles: {len(df):,} ({timeframe})")
+# Timeframe Selector
+if age_minutes > 10:
+    st.sidebar.warning("⚠️ Data may be stale!")
+st.sidebar.subheader("📊 Timeframe")
+timeframe = st.sidebar.selectbox(
+    "Candle Interval",
+    ["5m", "15m", "30m", "1h", "4h", "1D"],
+    index=0,
+    help="Aggregate 5-minute candles into larger timeframes"
+)
+
+# Timeframe aggregation settings
+timeframe_minutes = {
+    "5m": 5,
+    "15m": 15,
+    "30m": 30,
+    "1h": 60,
+    "4h": 240,
+    "1D": 1440
+}
+
 
 df = df.sort_values("timestamp")
 
@@ -118,9 +218,13 @@ if tv_presets[preset] is not None:
     cutoff = df["timestamp"].max() - tv_presets[preset]
     df = df[df["timestamp"] >= cutoff]
 
+
+
 # Asset Selector
 st.sidebar.subheader("💰 Asset")
 asset_choice = st.sidebar.radio("Price Asset", ["btc", "eth", "sol"], index=0)
+
+
 
 # Cohort Reference Guide
 st.sidebar.markdown("---")
@@ -147,7 +251,8 @@ for seg, (emoji, range_val, desc) in cohort_info.items():
         """,
         unsafe_allow_html=True
     )
-
+# Apply timeframe aggregation
+df = aggregate_timeframe(df, timeframe_minutes[timeframe])
 # ---------------------------------------------------
 # Utility Functions
 # ---------------------------------------------------
@@ -205,7 +310,7 @@ latest = df.iloc[-1]
 # TAB 1: PRICE & BIAS
 # ===================================================
 with tab1:
-    st.subheader(f"{asset_choice.upper()} Price Action with Cohort Bias")
+    st.subheader(f"{asset_choice.upper()} Price Action ({timeframe} candles)")
     
     # KPI Cards for Bias
     kpi_cols = st.columns(7)
@@ -245,7 +350,7 @@ with tab1:
         if f"{seg}_bias" in df.columns:
             available_cohorts.append(seg)
     
-    default_cohorts = [c for c in ["whale", "leviathan"] if c in available_cohorts]
+    default_cohorts = [c for c in ["fish", "leviathan"] if c in available_cohorts]
     
     selected_cohorts = st.multiselect(
         "Select Cohorts to Display",
