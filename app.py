@@ -171,28 +171,10 @@ age_minutes = (current_time - latest_time).total_seconds() / 60
 
 st.sidebar.info(f"📊 Last data: {latest_time.strftime('%H:%M:%S EST')}")
 st.sidebar.info(f"⏱️ Age: {age_minutes:.1f} minutes")
-# st.sidebar.info(f"📈 Candles: {len(df):,} ({timeframe})")
-# Timeframe Selector
+st.sidebar.info(f"📈 Candles: {len(df):,} ({timeframe})")
+
 if age_minutes > 10:
     st.sidebar.warning("⚠️ Data may be stale!")
-st.sidebar.subheader("📊 Timeframe")
-timeframe = st.sidebar.selectbox(
-    "Candle Interval",
-    ["5m", "15m", "30m", "1h", "4h", "1D"],
-    index=0,
-    help="Aggregate 5-minute candles into larger timeframes"
-)
-
-# Timeframe aggregation settings
-timeframe_minutes = {
-    "5m": 5,
-    "15m": 15,
-    "30m": 30,
-    "1h": 60,
-    "4h": 240,
-    "1D": 1440
-}
-
 
 df = df.sort_values("timestamp")
 
@@ -218,13 +200,31 @@ if tv_presets[preset] is not None:
     cutoff = df["timestamp"].max() - tv_presets[preset]
     df = df[df["timestamp"] >= cutoff]
 
-
+# Apply timeframe aggregation
+df = aggregate_timeframe(df, timeframe_minutes[timeframe])
 
 # Asset Selector
 st.sidebar.subheader("💰 Asset")
 asset_choice = st.sidebar.radio("Price Asset", ["btc", "eth", "sol"], index=0)
 
+# Timeframe Selector
+st.sidebar.subheader("📊 Timeframe")
+timeframe = st.sidebar.selectbox(
+    "Candle Interval",
+    ["5m", "15m", "30m", "1h", "4h", "1D"],
+    index=0,
+    help="Aggregate 5-minute candles into larger timeframes"
+)
 
+# Timeframe aggregation settings
+timeframe_minutes = {
+    "5m": 5,
+    "15m": 15,
+    "30m": 30,
+    "1h": 60,
+    "4h": 240,
+    "1D": 1440
+}
 
 # Cohort Reference Guide
 st.sidebar.markdown("---")
@@ -251,8 +251,7 @@ for seg, (emoji, range_val, desc) in cohort_info.items():
         """,
         unsafe_allow_html=True
     )
-# Apply timeframe aggregation
-df = aggregate_timeframe(df, timeframe_minutes[timeframe])
+
 # ---------------------------------------------------
 # Utility Functions
 # ---------------------------------------------------
@@ -350,7 +349,7 @@ with tab1:
         if f"{seg}_bias" in df.columns:
             available_cohorts.append(seg)
     
-    default_cohorts = [c for c in ["fish", "leviathan"] if c in available_cohorts]
+    default_cohorts = [c for c in ["whale", "leviathan"] if c in available_cohorts]
     
     selected_cohorts = st.multiselect(
         "Select Cohorts to Display",
@@ -405,6 +404,101 @@ with tab1:
     seriesCandlestickChart.extend(cohort_series)
     
     renderLightweightCharts([{"chart": chartOptions, "series": seriesCandlestickChart}], 'price_bias')
+    
+    # ---------------------------------------------------
+    # SENTIMENT TIMELINE
+    # ---------------------------------------------------
+    st.markdown("### 📊 Cohort Sentiment Timeline")
+    
+    fig_sentiment = go.Figure()
+    
+    # Add sentiment zones as background shapes
+    fig_sentiment.add_hrect(y0=-1, y1=-0.6, fillcolor="#D32F2F", opacity=0.1, line_width=0, annotation_text="Very Bearish", annotation_position="left")
+    fig_sentiment.add_hrect(y0=-0.6, y1=-0.2, fillcolor="#F57C00", opacity=0.1, line_width=0, annotation_text="Bearish", annotation_position="left")
+    fig_sentiment.add_hrect(y0=-0.2, y1=0.2, fillcolor="#757575", opacity=0.1, line_width=0, annotation_text="Neutral", annotation_position="left")
+    fig_sentiment.add_hrect(y0=0.2, y1=0.6, fillcolor="#4CAF50", opacity=0.1, line_width=0, annotation_text="Bullish", annotation_position="left")
+    fig_sentiment.add_hrect(y0=0.6, y1=1, fillcolor="#2ECC71", opacity=0.1, line_width=0, annotation_text="Very Bullish", annotation_position="left")
+    
+    # Add cohort bias lines
+    for seg in cohort_columns:
+        fig_sentiment.add_trace(go.Scatter(
+            x=df['timestamp'],
+            y=df[f'{seg}_bias'],
+            name=cohort_names[seg],
+            mode='lines',
+            line=dict(color=cohort_colors[seg], width=2),
+            hovertemplate='<b>%{fullData.name}</b><br>Bias: %{y:.3f}<br>%{x}<extra></extra>'
+        ))
+    
+    # Add horizontal lines at sentiment boundaries
+    fig_sentiment.add_hline(y=0, line_dash="solid", line_color="white", opacity=0.3, line_width=1)
+    fig_sentiment.add_hline(y=-0.6, line_dash="dash", line_color="gray", opacity=0.2)
+    fig_sentiment.add_hline(y=-0.2, line_dash="dash", line_color="gray", opacity=0.2)
+    fig_sentiment.add_hline(y=0.2, line_dash="dash", line_color="gray", opacity=0.2)
+    fig_sentiment.add_hline(y=0.6, line_dash="dash", line_color="gray", opacity=0.2)
+    
+    fig_sentiment.update_layout(
+        template='plotly_dark',
+        height=500,
+        hovermode='x unified',
+        yaxis_title='Bias (Sentiment)',
+        xaxis_title='Time',
+        yaxis_range=[-1, 1],
+        plot_bgcolor='#000000',
+        paper_bgcolor='#000000',
+        legend=dict(
+            orientation="h",
+            yanchor="bottom",
+            y=1.02,
+            xanchor="right",
+            x=1
+        )
+    )
+    
+    st.plotly_chart(fig_sentiment, use_container_width=True)
+    
+    # ---------------------------------------------------
+    # SENTIMENT HEATMAP
+    # ---------------------------------------------------
+    st.markdown("### 🔥 Sentiment Heatmap by Cohort")
+    
+    # Create heatmap data
+    heatmap_data = []
+    for seg in cohort_columns:
+        heatmap_data.append(df[f'{seg}_bias'].values)
+    
+    fig_heatmap = go.Figure(data=go.Heatmap(
+        z=heatmap_data,
+        x=df['timestamp'],
+        y=[cohort_names[seg] for seg in cohort_columns],
+        colorscale=[
+            [0, '#D32F2F'],      # Very Bearish
+            [0.2, '#F57C00'],    # Bearish
+            [0.4, '#757575'],    # Neutral
+            [0.6, '#4CAF50'],    # Bullish
+            [1, '#2ECC71']       # Very Bullish
+        ],
+        zmid=0,
+        zmin=-1,
+        zmax=1,
+        colorbar=dict(
+            title="Bias",
+            tickvals=[-0.8, -0.4, 0, 0.4, 0.8],
+            ticktext=['Very Bearish', 'Bearish', 'Neutral', 'Bullish', 'Very Bullish']
+        ),
+        hovertemplate='<b>%{y}</b><br>Time: %{x}<br>Bias: %{z:.3f}<extra></extra>'
+    ))
+    
+    fig_heatmap.update_layout(
+        template='plotly_dark',
+        height=400,
+        xaxis_title='Time',
+        yaxis_title='Cohort',
+        plot_bgcolor='#000000',
+        paper_bgcolor='#000000'
+    )
+    
+    st.plotly_chart(fig_heatmap, use_container_width=True)
 
 # ===================================================
 # TAB 2: CAPITAL FLOW
@@ -495,7 +589,7 @@ with tab2:
         paper_bgcolor='#000000'
     )
     
-    st.plotly_chart(fig_equity, width='stretch')
+    st.plotly_chart(fig_equity, use_container_width=True)
     
     # Capital distribution pie chart
     col1, col2 = st.columns(2)
@@ -518,7 +612,7 @@ with tab2:
             paper_bgcolor='#000000'
         )
         
-        st.plotly_chart(fig_pie, width='stretch')
+        st.plotly_chart(fig_pie, use_container_width=True)
     
     with col2:
         st.markdown("### Active vs Total Equity")
@@ -545,7 +639,7 @@ with tab2:
             paper_bgcolor='#000000'
         )
         
-        st.plotly_chart(fig_bar, width='stretch')
+        st.plotly_chart(fig_bar, use_container_width=True)
 
 # ===================================================
 # TAB 3: WIN RATES
@@ -608,7 +702,7 @@ with tab3:
         paper_bgcolor='#000000'
     )
     
-    st.plotly_chart(fig_winrate, width='stretch')
+    st.plotly_chart(fig_winrate, use_container_width=True)
     
     # Smart Money vs Dumb Money comparison
     col1, col2 = st.columns(2)
@@ -637,7 +731,7 @@ with tab3:
             paper_bgcolor='#000000'
         )
         
-        st.plotly_chart(fig_compare, width='stretch')
+        st.plotly_chart(fig_compare, use_container_width=True)
     
     with col2:
         st.markdown("### PnL Distribution")
@@ -662,7 +756,7 @@ with tab3:
             paper_bgcolor='#000000'
         )
         
-        st.plotly_chart(fig_pnl, width='stretch')
+        st.plotly_chart(fig_pnl, use_container_width=True)
 
 # ===================================================
 # TAB 4: LONG/SHORT
@@ -761,7 +855,7 @@ with tab4:
         paper_bgcolor='#000000'
     )
     
-    st.plotly_chart(fig_ls, width='stretch')
+    st.plotly_chart(fig_ls, use_container_width=True)
     
     # Long/Short ratio over time
     st.markdown("### Long/Short Ratio Timeline")
@@ -796,7 +890,7 @@ with tab4:
         paper_bgcolor='#000000'
     )
     
-    st.plotly_chart(fig_ratio, width='stretch')
+    st.plotly_chart(fig_ratio, use_container_width=True)
 
 # ===================================================
 # TAB 5: RISK METRICS
@@ -893,7 +987,7 @@ with tab5:
         paper_bgcolor='#000000'
     )
     
-    st.plotly_chart(fig_exposure, width='stretch')
+    st.plotly_chart(fig_exposure, use_container_width=True)
     
     # Risk heatmap
     col1, col2 = st.columns(2)
@@ -930,7 +1024,7 @@ with tab5:
             paper_bgcolor='#000000'
         )
         
-        st.plotly_chart(fig_exp_bar, width='stretch')
+        st.plotly_chart(fig_exp_bar, use_container_width=True)
     
     with col2:
         st.markdown("### Total Size by Cohort")
@@ -953,7 +1047,7 @@ with tab5:
             paper_bgcolor='#000000'
         )
         
-        st.plotly_chart(fig_size, width='stretch')
+        st.plotly_chart(fig_size, use_container_width=True)
 
 # ---------------------------------------------------
 # Footer
