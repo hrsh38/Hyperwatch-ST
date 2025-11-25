@@ -162,6 +162,24 @@ df = load_candlestick_data(get_cache_key())
 if df.empty:
     st.error("No data available in database.")
     st.stop()
+# Timeframe Selector
+st.sidebar.subheader("📊 Timeframe")
+timeframe = st.sidebar.selectbox(
+    "Candle Interval",
+    ["5m", "15m", "30m", "1h", "4h", "1D"],
+    index=0,
+    help="Aggregate 5-minute candles into larger timeframes"
+)
+
+# Timeframe aggregation settings
+timeframe_minutes = {
+    "5m": 5,
+    "15m": 15,
+    "30m": 30,
+    "1h": 60,
+    "4h": 240,
+    "1D": 1440
+}
 
 # Show data freshness info
 latest_time = df.iloc[-1]['timestamp']
@@ -207,24 +225,6 @@ df = aggregate_timeframe(df, timeframe_minutes[timeframe])
 st.sidebar.subheader("💰 Asset")
 asset_choice = st.sidebar.radio("Price Asset", ["btc", "eth", "sol"], index=0)
 
-# Timeframe Selector
-st.sidebar.subheader("📊 Timeframe")
-timeframe = st.sidebar.selectbox(
-    "Candle Interval",
-    ["5m", "15m", "30m", "1h", "4h", "1D"],
-    index=0,
-    help="Aggregate 5-minute candles into larger timeframes"
-)
-
-# Timeframe aggregation settings
-timeframe_minutes = {
-    "5m": 5,
-    "15m": 15,
-    "30m": 30,
-    "1h": 60,
-    "4h": 240,
-    "1D": 1440
-}
 
 # Cohort Reference Guide
 st.sidebar.markdown("---")
