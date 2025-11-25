@@ -408,54 +408,54 @@ with tab1:
     # ---------------------------------------------------
     # SENTIMENT TIMELINE
     # ---------------------------------------------------
-    st.markdown("### 📊 Cohort Sentiment Timeline")
+    # st.markdown("### 📊 Cohort Sentiment Timeline")
     
-    fig_sentiment = go.Figure()
+    # fig_sentiment = go.Figure()
     
-    # Add sentiment zones as background shapes
-    fig_sentiment.add_hrect(y0=-1, y1=-0.6, fillcolor="#D32F2F", opacity=0.1, line_width=0, annotation_text="Very Bearish", annotation_position="left")
-    fig_sentiment.add_hrect(y0=-0.6, y1=-0.2, fillcolor="#F57C00", opacity=0.1, line_width=0, annotation_text="Bearish", annotation_position="left")
-    fig_sentiment.add_hrect(y0=-0.2, y1=0.2, fillcolor="#757575", opacity=0.1, line_width=0, annotation_text="Neutral", annotation_position="left")
-    fig_sentiment.add_hrect(y0=0.2, y1=0.6, fillcolor="#4CAF50", opacity=0.1, line_width=0, annotation_text="Bullish", annotation_position="left")
-    fig_sentiment.add_hrect(y0=0.6, y1=1, fillcolor="#2ECC71", opacity=0.1, line_width=0, annotation_text="Very Bullish", annotation_position="left")
+    # # Add sentiment zones as background shapes
+    # fig_sentiment.add_hrect(y0=-1, y1=-0.6, fillcolor="#D32F2F", opacity=0.1, line_width=0, annotation_text="Very Bearish", annotation_position="left")
+    # fig_sentiment.add_hrect(y0=-0.6, y1=-0.2, fillcolor="#F57C00", opacity=0.1, line_width=0, annotation_text="Bearish", annotation_position="left")
+    # fig_sentiment.add_hrect(y0=-0.2, y1=0.2, fillcolor="#757575", opacity=0.1, line_width=0, annotation_text="Neutral", annotation_position="left")
+    # fig_sentiment.add_hrect(y0=0.2, y1=0.6, fillcolor="#4CAF50", opacity=0.1, line_width=0, annotation_text="Bullish", annotation_position="left")
+    # fig_sentiment.add_hrect(y0=0.6, y1=1, fillcolor="#2ECC71", opacity=0.1, line_width=0, annotation_text="Very Bullish", annotation_position="left")
     
-    # Add cohort bias lines
-    for seg in cohort_columns:
-        fig_sentiment.add_trace(go.Scatter(
-            x=df['timestamp'],
-            y=df[f'{seg}_bias'],
-            name=cohort_names[seg],
-            mode='lines',
-            line=dict(color=cohort_colors[seg], width=2),
-            hovertemplate='<b>%{fullData.name}</b><br>Bias: %{y:.3f}<br>%{x}<extra></extra>'
-        ))
+    # # Add cohort bias lines
+    # for seg in cohort_columns:
+    #     fig_sentiment.add_trace(go.Scatter(
+    #         x=df['timestamp'],
+    #         y=df[f'{seg}_bias'],
+    #         name=cohort_names[seg],
+    #         mode='lines',
+    #         line=dict(color=cohort_colors[seg], width=2),
+    #         hovertemplate='<b>%{fullData.name}</b><br>Bias: %{y:.3f}<br>%{x}<extra></extra>'
+    #     ))
     
-    # Add horizontal lines at sentiment boundaries
-    fig_sentiment.add_hline(y=0, line_dash="solid", line_color="white", opacity=0.3, line_width=1)
-    fig_sentiment.add_hline(y=-0.6, line_dash="dash", line_color="gray", opacity=0.2)
-    fig_sentiment.add_hline(y=-0.2, line_dash="dash", line_color="gray", opacity=0.2)
-    fig_sentiment.add_hline(y=0.2, line_dash="dash", line_color="gray", opacity=0.2)
-    fig_sentiment.add_hline(y=0.6, line_dash="dash", line_color="gray", opacity=0.2)
+    # # Add horizontal lines at sentiment boundaries
+    # fig_sentiment.add_hline(y=0, line_dash="solid", line_color="white", opacity=0.3, line_width=1)
+    # fig_sentiment.add_hline(y=-0.6, line_dash="dash", line_color="gray", opacity=0.2)
+    # fig_sentiment.add_hline(y=-0.2, line_dash="dash", line_color="gray", opacity=0.2)
+    # fig_sentiment.add_hline(y=0.2, line_dash="dash", line_color="gray", opacity=0.2)
+    # fig_sentiment.add_hline(y=0.6, line_dash="dash", line_color="gray", opacity=0.2)
     
-    fig_sentiment.update_layout(
-        template='plotly_dark',
-        height=500,
-        hovermode='x unified',
-        yaxis_title='Bias (Sentiment)',
-        xaxis_title='Time',
-        yaxis_range=[-1, 1],
-        plot_bgcolor='#000000',
-        paper_bgcolor='#000000',
-        legend=dict(
-            orientation="h",
-            yanchor="bottom",
-            y=1.02,
-            xanchor="right",
-            x=1
-        )
-    )
+    # fig_sentiment.update_layout(
+    #     template='plotly_dark',
+    #     height=500,
+    #     hovermode='x unified',
+    #     yaxis_title='Bias (Sentiment)',
+    #     xaxis_title='Time',
+    #     yaxis_range=[-1, 1],
+    #     plot_bgcolor='#000000',
+    #     paper_bgcolor='#000000',
+    #     legend=dict(
+    #         orientation="h",
+    #         yanchor="bottom",
+    #         y=1.02,
+    #         xanchor="right",
+    #         x=1
+    #     )
+    # )
     
-    st.plotly_chart(fig_sentiment, use_container_width=True)
+    # st.plotly_chart(fig_sentiment, use_container_width=True)
     
     # ---------------------------------------------------
     # SENTIMENT HEATMAP
