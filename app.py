@@ -495,7 +495,7 @@ with tab2:
         paper_bgcolor='#000000'
     )
     
-    st.plotly_chart(fig_equity, use_container_width=True)
+    st.plotly_chart(fig_equity, width='stretch')
     
     # Capital distribution pie chart
     col1, col2 = st.columns(2)
@@ -518,7 +518,7 @@ with tab2:
             paper_bgcolor='#000000'
         )
         
-        st.plotly_chart(fig_pie, use_container_width=True)
+        st.plotly_chart(fig_pie, width='stretch')
     
     with col2:
         st.markdown("### Active vs Total Equity")
@@ -545,7 +545,7 @@ with tab2:
             paper_bgcolor='#000000'
         )
         
-        st.plotly_chart(fig_bar, use_container_width=True)
+        st.plotly_chart(fig_bar, width='stretch')
 
 # ===================================================
 # TAB 3: WIN RATES
@@ -608,7 +608,7 @@ with tab3:
         paper_bgcolor='#000000'
     )
     
-    st.plotly_chart(fig_winrate, use_container_width=True)
+    st.plotly_chart(fig_winrate, width='stretch')
     
     # Smart Money vs Dumb Money comparison
     col1, col2 = st.columns(2)
@@ -637,7 +637,7 @@ with tab3:
             paper_bgcolor='#000000'
         )
         
-        st.plotly_chart(fig_compare, use_container_width=True)
+        st.plotly_chart(fig_compare, width='stretch')
     
     with col2:
         st.markdown("### PnL Distribution")
@@ -662,7 +662,7 @@ with tab3:
             paper_bgcolor='#000000'
         )
         
-        st.plotly_chart(fig_pnl, use_container_width=True)
+        st.plotly_chart(fig_pnl, width='stretch')
 
 # ===================================================
 # TAB 4: LONG/SHORT
@@ -761,7 +761,7 @@ with tab4:
         paper_bgcolor='#000000'
     )
     
-    st.plotly_chart(fig_ls, use_container_width=True)
+    st.plotly_chart(fig_ls, width='stretch')
     
     # Long/Short ratio over time
     st.markdown("### Long/Short Ratio Timeline")
@@ -796,7 +796,7 @@ with tab4:
         paper_bgcolor='#000000'
     )
     
-    st.plotly_chart(fig_ratio, use_container_width=True)
+    st.plotly_chart(fig_ratio, width='stretch')
 
 # ===================================================
 # TAB 5: RISK METRICS
@@ -893,7 +893,7 @@ with tab5:
         paper_bgcolor='#000000'
     )
     
-    st.plotly_chart(fig_exposure, use_container_width=True)
+    st.plotly_chart(fig_exposure, width='stretch')
     
     # Risk heatmap
     col1, col2 = st.columns(2)
@@ -930,7 +930,7 @@ with tab5:
             paper_bgcolor='#000000'
         )
         
-        st.plotly_chart(fig_exp_bar, use_container_width=True)
+        st.plotly_chart(fig_exp_bar, width='stretch')
     
     with col2:
         st.markdown("### Total Size by Cohort")
@@ -953,7 +953,7 @@ with tab5:
             paper_bgcolor='#000000'
         )
         
-        st.plotly_chart(fig_size, use_container_width=True)
+        st.plotly_chart(fig_size, width='stretch')
 
 # ---------------------------------------------------
 # Footer
