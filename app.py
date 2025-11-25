@@ -171,7 +171,7 @@ age_minutes = (current_time - latest_time).total_seconds() / 60
 
 st.sidebar.info(f"📊 Last data: {latest_time.strftime('%H:%M:%S EST')}")
 st.sidebar.info(f"⏱️ Age: {age_minutes:.1f} minutes")
-st.sidebar.info(f"📈 Candles: {len(df):,} ({timeframe})")
+# st.sidebar.info(f"📈 Candles: {len(df):,} ({timeframe})")
 
 if age_minutes > 10:
     st.sidebar.warning("⚠️ Data may be stale!")
