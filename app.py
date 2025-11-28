@@ -349,7 +349,7 @@ with tab1:
         if f"{seg}_bias" in df.columns:
             available_cohorts.append(seg)
     
-    default_cohorts = [c for c in ["whale", "leviathan"] if c in available_cohorts]
+    default_cohorts = [c for c in ["fish", "leviathan"] if c in available_cohorts]
     
     selected_cohorts = st.multiselect(
         "Select Cohorts to Display",
